@@ -224,19 +224,19 @@ pub const Client = struct {
     }
 
     pub fn read(self: Client, buffer: []u8) ReadError!usize {
-        const read_len = c.wolfSSL_read(self.ssl, buffer.ptr, @intCast(c_int, buffer.len));
+        const read_len = c.wolfSSL_read(self.ssl, buffer.ptr, @intCast(buffer.len));
         if (read_len < 0) {
             try wolfCheck(c.wolfSSL_get_error(self.ssl, read_len));
         }
-        return @intCast(usize, read_len);
+        return @as(usize, @intCast(read_len));
     }
 
     pub fn write(self: Client, buffer: []const u8) WriteError!usize {
-        const write_len = c.wolfSSL_write(self.ssl, buffer.ptr, @intCast(c_int, buffer.len));
+        const write_len = c.wolfSSL_write(self.ssl, buffer.ptr, @intCast(buffer.len));
         if (write_len < 0) {
             try wolfCheck(c.wolfSSL_get_error(self.ssl, write_len));
         }
-        return @intCast(usize, write_len);
+        return @as(usize, @intCast(write_len));
     }
 };
 
@@ -284,14 +284,13 @@ fn wolfCheck(err_code: c_int) Error!void {
 
 /// PicoTCP send/receive callbacks */
 fn zigSend(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv(.C) c_int {
-    _ = ctx;
     _ = ssl;
     if (len == 0)
         return 0;
 
-    const sock = @ptrCast(*network.Socket, @alignCast(@alignOf(network.Socket), ctx.?));
+    const sock = @as(*network.Socket, @ptrCast(@alignCast(ctx.?)));
 
-    const actual_len = sock.send(buf[0..@intCast(usize, len)]) catch |err| {
+    const actual_len = sock.send(buf[0..@as(usize, @intCast(len))]) catch |err| {
         logger.err("socket send: {}", .{err});
 
         return switch (err) {
@@ -307,18 +306,17 @@ fn zigSend(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv
     if (actual_len == 0)
         return c.WOLFSSL_CBIO_ERR_CONN_CLOSE;
 
-    return @intCast(c_int, actual_len);
+    return @intCast(actual_len);
 }
 
 fn zigRecv(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv(.C) c_int {
-    _ = ctx;
     _ = ssl;
     if (len == 0)
         return 0;
 
-    const sock = @ptrCast(*network.Socket, @alignCast(@alignOf(network.Socket), ctx.?));
+    const sock = @as(*network.Socket, @ptrCast(@alignCast(ctx.?)));
 
-    const actual_len = sock.receive(buf[0..@intCast(usize, len)]) catch |err| {
+    const actual_len = sock.receive(buf[0..@as(usize, @intCast(len))]) catch |err| {
         logger.err("socket receive: {}", .{err});
 
         return switch (err) {
@@ -334,7 +332,7 @@ fn zigRecv(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv
 
     if (actual_len == 0)
         return c.WOLFSSL_CBIO_ERR_CONN_CLOSE;
-    return @intCast(c_int, actual_len);
+    return @intCast(actual_len);
 }
 
 const wolfSSL_ErrorCodes = enum(c_int) {

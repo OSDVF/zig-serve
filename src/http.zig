@@ -408,7 +408,7 @@ pub const HttpResponse = struct {
         try stream.print("HTTP/{}.{} {} {s}\r\n", .{
             ctx.request.version.major,
             ctx.request.version.minor,
-            @enumToInt(self.status_code),
+            @intFromEnum(self.status_code),
             reason_phrase,
         });
 
@@ -526,7 +526,7 @@ pub const CaseInsensitiveStringContext = struct {
         var buffer: [128]u8 = undefined;
         var i: usize = 0;
         while (i < s.len) : (i += buffer.len) {
-            const source = s[i..std.math.min(s.len, i + buffer.len)];
+            const source = s[i..@min(s.len, i + buffer.len)];
             std.mem.copy(u8, &buffer, s);
             for (buffer[0..source.len]) |*c| {
                 c.* = std.ascii.toLower(c.*);

@@ -84,12 +84,10 @@ pub const include_dirs = [_][]const u8{
 };
 
 pub fn createWolfSSL(b: *std.build.Builder, target: std.zig.CrossTarget) *std.build.LibExeObjStep {
-    const lib = b.addStaticLibrary("wolfSSL", null);
-    lib.setBuildMode(.ReleaseSafe);
-    lib.setTarget(target);
-    lib.addCSourceFiles(&wolfssl_sources, &wolfssl_flags);
-    lib.addCSourceFiles(&wolfcrypt_sources, &wolfcrypt_flags);
-    lib.addIncludeDir(sdkPath("/vendor/wolfssl/"));
+    const lib = b.addStaticLibrary(.{ .name = "wolfSSL", .target = target, .optimize = .ReleaseSafe });
+    lib.addCSourceFiles(.{ .files = &wolfssl_sources, .flags = &wolfssl_flags });
+    lib.addCSourceFiles(.{ .files = &wolfcrypt_sources, .flags = &wolfcrypt_flags });
+    lib.addIncludePath(.{ .path = sdkPath("/vendor/wolfssl/") });
 
     lib.defineCMacro("TFM_TIMING_RESISTANT", null);
     lib.defineCMacro("ECC_TIMING_RESISTANT", null);
@@ -122,6 +120,15 @@ pub fn createWolfSSL(b: *std.build.Builder, target: std.zig.CrossTarget) *std.bu
     lib.defineCMacro("SESSION_CERTS", null);
     lib.defineCMacro("OPENSSL_EXTRA_X509", null);
     lib.defineCMacro("OPENSSL_EXTRA_X509_SMALL", null);
+    switch (target.getOsTag()) {
+        .linux, .macos => {},
+        .windows => {
+            lib.defineCMacro("USE_WINDOWS_API", null);
+        },
+        else => {},
+    }
+    lib.defineCMacro("USE_WOLF_STRTOK", null);
+
     lib.linkLibC();
 
     return lib;
@@ -155,26 +162,26 @@ const wolfcrypt_sources = [_][]const u8{
     sdkPath("/vendor/wolfssl/wolfcrypt/src/blake2b.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/blake2s.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/camellia.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha20_poly1305.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha_asm.S"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/cmac.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/coding.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/compress.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/cpuid.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/cryptocb.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/curve448.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/curve25519.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/curve448.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/des3.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/dh.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/dsa.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/ecc.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/eccsi.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/ecc_fp.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/ed448.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/eccsi.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/ed25519.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/ed448.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/error.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/evp.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/falcon.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/fe_448.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/fe_low_mem.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/fe_operations.c"),
@@ -193,8 +200,8 @@ const wolfcrypt_sources = [_][]const u8{
     sdkPath("/vendor/wolfssl/wolfcrypt/src/md5.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/memory.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/misc.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/pkcs7.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/pkcs12.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/pkcs7.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/poly1305.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/pwdbased.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/rabbit.c"),
@@ -203,10 +210,10 @@ const wolfcrypt_sources = [_][]const u8{
     sdkPath("/vendor/wolfssl/wolfcrypt/src/ripemd.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/rsa.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/sakke.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/sha.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/sha3.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/sha256.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/sha3.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/sha512.c"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/sha.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/signature.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/sp_arm32.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/sp_arm64.c"),

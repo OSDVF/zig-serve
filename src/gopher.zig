@@ -236,7 +236,7 @@ pub fn GopherMap(comptime Writer: type) type {
             const hostname = data.hostname orelse map.hostname;
             const port = data.port orelse map.port;
             try map.writer.print("{c}{s}\t{s}\t{s}\t{d}\r\n", .{
-                @enumToInt(data.kind),
+                @intFromEnum(data.kind),
                 data.display,
                 data.selector,
                 hostname,

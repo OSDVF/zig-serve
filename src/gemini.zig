@@ -266,7 +266,7 @@ pub const GeminiResponse = struct {
                 .client_certificate_required => "client certificate required",
                 .certificate_not_authorised => "certificate not authorised",
                 .certificate_not_valid => "certificate not valid",
-                else => switch (@enumToInt(status_code) / 10) {
+                else => switch (@intFromEnum(status_code) / 10) {
                     0 => "undefined",
                     1 => "input",
                     2 => "success",
@@ -291,8 +291,8 @@ pub const GeminiResponse = struct {
 
     fn writeHeader(self: *GeminiResponse) !void {
         try self.ssl.writer().print("{}{} {s}\r\n", .{
-            (@enumToInt(self.status_code) / 10) % 10,
-            (@enumToInt(self.status_code) / 1) % 10,
+            (@intFromEnum(self.status_code) / 10) % 10,
+            (@intFromEnum(self.status_code) / 1) % 10,
             self.meta.items,
         });
     }
@@ -339,6 +339,6 @@ pub const GeminiStatusCode = enum(u8) {
     _, // other status codes are legal as well
 
     pub fn class(self: GeminiStatusCode) GeminiStatusClass {
-        return @intToEnum(GeminiStatusClass, @truncate(u4, @enumToInt(self) / 10));
+        return @as(GeminiStatusClass, @enumFromInt(@as(u4, @truncate(@intFromEnum(self) / 10))));
     }
 };
