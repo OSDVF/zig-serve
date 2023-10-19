@@ -1,6 +1,6 @@
 const std = @import("std");
 
-fn sdkPath(comptime suffix: []const u8) []const u8 {
+pub fn sdkPath(comptime suffix: []const u8) []const u8 {
     if (suffix[0] != '/') @compileError("relToPath requires an absolute path!");
     return comptime blk: {
         const root_dir = std.fs.path.dirname(@src().file) orelse ".";
