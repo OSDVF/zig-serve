@@ -14,6 +14,7 @@ pub const HttpListener = struct {
 
     allocator: std.mem.Allocator,
     bindings: std.ArrayList(Binding),
+    stopping: *std.Thread.Mutex,
 
     /// Normalize incoming paths for the client, so a query to `"/"`, `"//"` and `""` are equivalent and will all receive
     /// `"/"` as the path.
@@ -23,19 +24,24 @@ pub const HttpListener = struct {
         return HttpListener{
             .allocator = allocator,
             .bindings = std.ArrayList(Binding).init(allocator),
+            .stopping = try allocator.create(std.Thread.Mutex),
         };
     }
 
     pub fn deinit(self: *HttpListener) void {
+        self.stopping.lock();
         for (self.bindings.items) |*bind| {
             if (bind.tls) |*tls| {
                 tls.deinit();
             }
+            bind.tls = null;
             if (bind.socket) |*sock| {
                 sock.close();
             }
+            bind.socket = null;
         }
         self.bindings.deinit();
+        self.allocator.destroy(self.stopping);
         self.* = undefined;
     }
 
@@ -131,6 +137,7 @@ pub const HttpListener = struct {
     }
 
     pub fn stop(self: *HttpListener) void {
+        self.stopping.lock(); // assume stopping from different thread
         for (self.bindings.items) |*bind| {
             if (bind.socket) |*sock| {
                 sock.close();
@@ -140,7 +147,7 @@ pub const HttpListener = struct {
     }
 
     const GetContextError = std.os.PollError || std.os.AcceptError || network.Socket.Reader.Error || error{ UnsupportedAddressFamily, NotStarted, OutOfMemory, EndOfStream, StreamTooLong };
-    pub fn getContext(self: *HttpListener) GetContextError!*HttpContext {
+    pub fn getContext(self: *HttpListener) GetContextError!?*HttpContext {
         for (self.bindings.items) |*bind| {
             if (bind.socket == null)
                 return error.NotStarted;
@@ -149,17 +156,24 @@ pub const HttpListener = struct {
         var set = try network.SocketSet.init(self.allocator);
         defer set.deinit();
 
-        while (true) {
+        while (self.stopping.tryLock()) {
+            defer self.stopping.unlock();
             for (self.bindings.items) |*bind| {
                 try set.add(bind.socket.?, .{ .read = true, .write = false });
             }
 
-            const events = try network.waitForSocketEvent(&set, null);
-            std.debug.assert(events >= 1);
+            const events = try network.waitForSocketEvent(&set, 2000000); //2s timeout
+            if (events == 0) {
+                continue;
+            }
 
             var any_error = false;
 
             for (self.bindings.items) |*bind| {
+                if (bind.socket == null) {
+                    any_error = true;
+                    continue;
+                }
                 if (set.isReadyRead(bind.socket.?)) {
                     return self.acceptContext(bind.socket.?, if (bind.tls) |*tls| tls else null) catch |e| {
                         logger.warn("Invalid incoming connection: {s}", .{@errorName(e)});
@@ -175,6 +189,8 @@ pub const HttpListener = struct {
             // This means something very terrible has gone wrong
             std.debug.assert(any_error);
         }
+        deinit(self);
+        return null;
     }
 
     fn acceptContext(self: *HttpListener, sock: network.Socket, maybe_tls: ?*serve.TlsCore) !*HttpContext {
