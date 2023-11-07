@@ -15,6 +15,7 @@ pub const HttpListener = struct {
     allocator: std.mem.Allocator,
     bindings: std.ArrayList(Binding),
     stopping: *std.Thread.Mutex,
+    stopped: bool,
 
     /// Normalize incoming paths for the client, so a query to `"/"`, `"//"` and `""` are equivalent and will all receive
     /// `"/"` as the path.
@@ -25,6 +26,7 @@ pub const HttpListener = struct {
             .allocator = allocator,
             .bindings = std.ArrayList(Binding).init(allocator),
             .stopping = try allocator.create(std.Thread.Mutex),
+            .stopped = false,
         };
     }
 
@@ -41,8 +43,9 @@ pub const HttpListener = struct {
             bind.socket = null;
         }
         self.bindings.deinit();
+        self.stopped = true;
+        self.stopping.unlock(); // deinit continues in getContext
         self.allocator.destroy(self.stopping);
-        self.* = undefined;
     }
 
     const AddEndpointError = error{ AlreadyExists, AlreadyStarted, TlsError, InvalidCertificate, OutOfMemory };
@@ -144,6 +147,7 @@ pub const HttpListener = struct {
             }
             bind.socket = null;
         }
+        self.stopping.unlock();
     }
 
     const GetContextError = std.os.PollError || std.os.AcceptError || network.Socket.Reader.Error || error{ UnsupportedAddressFamily, NotStarted, OutOfMemory, EndOfStream, StreamTooLong };
@@ -156,7 +160,7 @@ pub const HttpListener = struct {
         var set = try network.SocketSet.init(self.allocator);
         defer set.deinit();
 
-        while (self.stopping.tryLock()) {
+        while (!self.stopped and self.stopping.tryLock()) {
             defer self.stopping.unlock();
             for (self.bindings.items) |*bind| {
                 try set.add(bind.socket.?, .{ .read = true, .write = false });
@@ -167,11 +171,8 @@ pub const HttpListener = struct {
                 continue;
             }
 
-            var any_error = false;
-
             for (self.bindings.items) |*bind| {
                 if (bind.socket == null) {
-                    any_error = true;
                     continue;
                 }
                 if (set.isReadyRead(bind.socket.?)) {
@@ -180,16 +181,11 @@ pub const HttpListener = struct {
 
                         std.debug.dumpStackTrace((@errorReturnTrace() orelse unreachable).*);
 
-                        any_error = true;
                         continue;
                     };
                 }
             }
-
-            // This means something very terrible has gone wrong
-            std.debug.assert(any_error);
         }
-        deinit(self);
         return null;
     }
 
