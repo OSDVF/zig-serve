@@ -139,17 +139,6 @@ pub const HttpListener = struct {
         }
     }
 
-    pub fn stop(self: *HttpListener) void {
-        self.stopping.lock(); // assume stopping from different thread
-        for (self.bindings.items) |*bind| {
-            if (bind.socket) |*sock| {
-                sock.close();
-            }
-            bind.socket = null;
-        }
-        self.stopping.unlock();
-    }
-
     const GetContextError = std.os.PollError || std.os.AcceptError || network.Socket.Reader.Error || error{ UnsupportedAddressFamily, NotStarted, OutOfMemory, EndOfStream, StreamTooLong };
     pub fn getContext(self: *HttpListener) GetContextError!?*HttpContext {
         for (self.bindings.items) |*bind| {
@@ -163,6 +152,9 @@ pub const HttpListener = struct {
         while (!self.stopped and self.stopping.tryLock()) {
             defer self.stopping.unlock();
             for (self.bindings.items) |*bind| {
+                if (bind.socket == null) {
+                    continue;
+                }
                 try set.add(bind.socket.?, .{ .read = true, .write = false });
             }
 
@@ -186,6 +178,7 @@ pub const HttpListener = struct {
                 }
             }
         }
+        logger.debug("stopped listening", .{});
         return null;
     }
 
