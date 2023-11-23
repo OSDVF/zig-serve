@@ -59,7 +59,7 @@ pub const GeminiListener = struct {
         tls.useCertifcateFile(try temp.allocator().dupeZ(u8, certificate_file)) catch return error.InvalidCertificate;
         tls.usePrivateKeyFile(try temp.allocator().dupeZ(u8, key_file)) catch return error.InvalidCertificate;
 
-        var bind = Binding{
+        const bind = Binding{
             .address = target_ip.convertToNetwork(),
             .port = port,
             .socket = null,

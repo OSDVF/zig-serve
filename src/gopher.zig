@@ -41,7 +41,7 @@ pub const GopherListener = struct {
                 return error.AlreadyStarted;
         }
 
-        var bind = Binding{
+        const bind = Binding{
             .address = target_ip.convertToNetwork(),
             .port = port,
             .socket = null,

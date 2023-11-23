@@ -26,7 +26,7 @@ pub fn shutdown() void {
 ctx: *c.WOLFSSL_CTX,
 
 pub fn init() !TlsCore {
-    var core = TlsCore{
+    const core = TlsCore{
         .ctx = c.wolfSSL_CTX_new(c.wolfTLSv1_2_server_method()) orelse return error.WolfSSL,
     };
 
