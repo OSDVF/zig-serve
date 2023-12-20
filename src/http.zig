@@ -22,12 +22,14 @@ pub const HttpListener = struct {
     normalize_paths: bool = true,
 
     pub fn init(allocator: std.mem.Allocator) !HttpListener {
-        return HttpListener{
+        const l = HttpListener{
             .allocator = allocator,
             .bindings = std.ArrayList(Binding).init(allocator),
             .stopping = try allocator.create(std.Thread.Mutex),
             .stopped = false,
         };
+        l.stopping.* = std.Thread.Mutex{};
+        return l;
     }
 
     pub fn deinit(self: *HttpListener) void {
@@ -532,7 +534,7 @@ pub const CaseInsensitiveStringContext = struct {
         var i: usize = 0;
         while (i < s.len) : (i += buffer.len) {
             const source = s[i..@min(s.len, i + buffer.len)];
-            std.mem.copy(u8, &buffer, s);
+            std.mem.copyForwards(u8, &buffer, s);
             for (buffer[0..source.len]) |*c| {
                 c.* = std.ascii.toLower(c.*);
             }
