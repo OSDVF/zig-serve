@@ -240,7 +240,7 @@ pub const GeminiResponse = struct {
     meta: std.ArrayListUnmanaged(u8) = .{},
 
     fn getAllocator(self: *GeminiResponse) std.mem.Allocator {
-        return @fieldParentPtr(GeminiContext, "response", self).memory.allocator();
+        return @as(*GeminiContext, @fieldParentPtr("response", self)).memory.allocator();
     }
 
     pub fn setStatusCode(self: *GeminiResponse, status_code: GeminiStatusCode) !void {

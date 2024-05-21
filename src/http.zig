@@ -107,7 +107,7 @@ pub const HttpListener = struct {
         try self.bindings.append(bind);
     }
 
-    pub const StartError = std.os.SocketError || std.os.BindError || std.os.ListenError || error{ NoBindings, AlreadyStarted };
+    pub const StartError = std.posix.SocketError || std.posix.BindError || std.posix.ListenError || error{ NoBindings, AlreadyStarted };
     pub fn start(self: *HttpListener) StartError!void {
         if (self.bindings.items.len == 0) {
             return error.NoBindings;
@@ -137,7 +137,7 @@ pub const HttpListener = struct {
         }
     }
 
-    const GetContextError = std.os.PollError || std.os.AcceptError || network.Socket.Reader.Error || error{ UnsupportedAddressFamily, NotStarted, OutOfMemory, EndOfStream, StreamTooLong };
+    const GetContextError = std.posix.PollError || std.posix.AcceptError || network.Socket.Reader.Error || error{ UnsupportedAddressFamily, NotStarted, OutOfMemory, EndOfStream, StreamTooLong };
     pub fn getContext(self: *HttpListener) GetContextError!?*HttpContext {
         for (self.bindings.items) |*bind| {
             if (bind.socket == null)
@@ -321,7 +321,7 @@ pub const HttpRequest = struct {
     headers: CaseInsenitiveStringHashMapUnmanaged([]const u8) = .{},
 
     fn getContext(self: *HttpRequest) *HttpContext {
-        return &@fieldParentPtr(HttpContext, "request", self);
+        return @fieldParentPtr("request", self);
     }
 
     pub const Reader = std.io.Reader(*HttpResponse, Reader, read);
@@ -391,7 +391,7 @@ pub const HttpResponse = struct {
     }
 
     fn getContext(self: *HttpResponse) *HttpContext {
-        return @fieldParentPtr(HttpContext, "response", self);
+        return @fieldParentPtr("response", self);
     }
 
     fn getAllocator(self: *HttpResponse) std.mem.Allocator {
