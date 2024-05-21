@@ -4,6 +4,7 @@ const uri = @import("uri");
 const serve = @import("serve.zig");
 const logger = std.log.scoped(.serve_http);
 
+pub var log_connections = false;
 pub const HttpListener = struct {
     const Binding = struct {
         address: network.Address,
@@ -14,22 +15,18 @@ pub const HttpListener = struct {
 
     allocator: std.mem.Allocator,
     bindings: std.ArrayList(Binding),
-    stopping: *std.Thread.Mutex,
-    stopped: bool,
+    stopping: std.Thread.Mutex = .{},
+    stopped: bool = false,
 
     /// Normalize incoming paths for the client, so a query to `"/"`, `"//"` and `""` are equivalent and will all receive
     /// `"/"` as the path.
     normalize_paths: bool = true,
 
     pub fn init(allocator: std.mem.Allocator) !HttpListener {
-        const l = HttpListener{
+        return HttpListener{
             .allocator = allocator,
             .bindings = std.ArrayList(Binding).init(allocator),
-            .stopping = try allocator.create(std.Thread.Mutex),
-            .stopped = false,
         };
-        l.stopping.* = std.Thread.Mutex{};
-        return l;
     }
 
     pub fn deinit(self: *HttpListener) void {
@@ -47,7 +44,6 @@ pub const HttpListener = struct {
         self.bindings.deinit();
         self.stopped = true;
         self.stopping.unlock(); // deinit continues in getContext
-        self.allocator.destroy(self.stopping);
     }
 
     const AddEndpointError = error{ AlreadyExists, AlreadyStarted, TlsError, InvalidCertificate, OutOfMemory };
@@ -188,7 +184,8 @@ pub const HttpListener = struct {
         var client_sock: network.Socket = try sock.accept();
         errdefer client_sock.close();
 
-        logger.debug("accepted tcp connection from {!}", .{client_sock.getRemoteEndPoint()});
+        if (log_connections)
+            logger.debug("accepted tcp connection from {!}", .{client_sock.getRemoteEndPoint()});
 
         var temp_memory = std.heap.ArenaAllocator.init(self.allocator);
         errdefer temp_memory.deinit();
@@ -215,7 +212,8 @@ pub const HttpListener = struct {
         }
 
         if (context.ssl) |ssl| {
-            logger.debug("accepted tls connection", .{});
+            if (log_connections)
+                logger.debug("accepted tls connection", .{});
             context.request.client_certificate = try ssl.getPeerCertificate();
             context.request.requested_server_name = try ssl.getServerNameIndication(context.memory.allocator());
 
@@ -300,7 +298,8 @@ pub const HttpContext = struct {
     pub fn deinit(self: *HttpContext) void {
         self.finalize() catch |e| logger.warn("Failed to finalize connection: {s}", .{@errorName(e)});
 
-        logger.debug("closing tcp connection to {!}", .{self.socket.getRemoteEndPoint()});
+        if (log_connections)
+            logger.debug("closing tcp connection to {!}", .{self.socket.getRemoteEndPoint()});
 
         if (self.ssl) |*ssl| {
             ssl.close();
@@ -382,6 +381,7 @@ pub const HttpResponse = struct {
     }
 
     pub const Writer = std.io.Writer(*HttpResponse, WriteError, write);
+    /// No headers can be written after calling this function
     pub fn writer(self: *HttpResponse) !Writer {
         if (!self.is_writing_body) {
             try self.writeHeaders();

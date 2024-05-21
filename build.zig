@@ -83,8 +83,8 @@ pub const include_dirs = [_][]const u8{
     sdkPath("/vendor/wolfssl"),
 };
 
-pub fn createWolfSSL(b: *std.build.Builder, target: std.zig.CrossTarget) *std.build.LibExeObjStep {
-    const lib = b.addStaticLibrary(.{ .name = "wolfSSL", .target = target, .optimize = .ReleaseSafe });
+pub fn createWolfSSL(b: *std.build.Builder, target: std.zig.CrossTarget, optimize: std.builtin.OptimizeMode) *std.build.LibExeObjStep {
+    const lib = b.addStaticLibrary(.{ .name = "wolfSSL", .target = target, .optimize = optimize });
     lib.addCSourceFiles(.{ .files = &wolfssl_sources, .flags = &wolfssl_flags });
     lib.addCSourceFiles(.{ .files = &wolfcrypt_sources, .flags = &wolfcrypt_flags });
     lib.addIncludePath(.{ .path = sdkPath("/vendor/wolfssl/") });
@@ -163,7 +163,7 @@ const wolfcrypt_sources = [_][]const u8{
     sdkPath("/vendor/wolfssl/wolfcrypt/src/blake2s.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/camellia.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha20_poly1305.c"),
-    sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha_asm.S"),
+    sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha_asm.S"), //TODO submit issue to Ziglang to show linking errors for .S files
     sdkPath("/vendor/wolfssl/wolfcrypt/src/chacha.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/cmac.c"),
     sdkPath("/vendor/wolfssl/wolfcrypt/src/coding.c"),
