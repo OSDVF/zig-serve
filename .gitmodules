@@ -4,6 +4,3 @@
 [submodule "vendor/uri"]
 	path = vendor/uri
 	url = https://github.com/MasterQ32/zig-uri
-[submodule "vendor/wolfssl"]
-	path = vendor/wolfssl
-	url = https://github.com/wolfSSL/wolfssl
