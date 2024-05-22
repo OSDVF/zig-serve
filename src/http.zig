@@ -276,7 +276,7 @@ pub const HttpListener = struct {
             context.request.version = HttpVersion.@"HTTP/0.9";
         }
 
-        logger.info("request for {s}", .{url});
+        logger.debug("request for {s}", .{url});
     }
 };
 
