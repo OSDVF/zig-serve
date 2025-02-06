@@ -1,6 +1,6 @@
 [submodule "vendor/network"]
 	path = vendor/network
-	url = https://github.com/OSDVF/zig-network
+	url = https://github.com/ikskuh/zig-network
 [submodule "vendor/uri"]
 	path = vendor/uri
 	url = https://github.com/MasterQ32/zig-uri
