@@ -237,7 +237,7 @@ pub const GeminiResponse = struct {
     is_writing: bool = false,
 
     status_code: GeminiStatusCode = .success,
-    meta: std.ArrayListUnmanaged(u8) = .{},
+    meta: std.ArrayListUnmanaged(u8) = .empty,
 
     fn getAllocator(self: *GeminiResponse) std.mem.Allocator {
         return @as(*GeminiContext, @fieldParentPtr("response", self)).memory.allocator();

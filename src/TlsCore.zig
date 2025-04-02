@@ -77,7 +77,7 @@ pub fn accept(self: *TlsCore, socket: *network.Socket) !Client {
     };
 }
 
-fn verifyFn(some: c_int, certificate_store_ctx: [*c]c.WOLFSSL_X509_STORE_CTX) callconv(.C) c_int {
+fn verifyFn(some: c_int, certificate_store_ctx: [*c]c.WOLFSSL_X509_STORE_CTX) callconv(.c) c_int {
     _ = some;
     _ = certificate_store_ctx;
     // std.debug.print("{} {any}\n", .{ some, certificate_store_ctx });
@@ -283,7 +283,7 @@ fn wolfCheck(err_code: c_int) Error!void {
 }
 
 /// PicoTCP send/receive callbacks */
-fn zigSend(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv(.C) c_int {
+fn zigSend(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv(.c) c_int {
     _ = ssl;
     if (len == 0)
         return 0;
@@ -309,7 +309,7 @@ fn zigSend(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv
     return @intCast(actual_len);
 }
 
-fn zigRecv(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv(.C) c_int {
+fn zigRecv(ssl: ?*c.WOLFSSL, buf: [*c]u8, len: c_int, ctx: ?*anyopaque) callconv(.c) c_int {
     _ = ssl;
     if (len == 0)
         return 0;

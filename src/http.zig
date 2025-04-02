@@ -231,7 +231,7 @@ pub const HttpListener = struct {
             request_line = request_line[0 .. request_line.len - 1];
         }
 
-        var tokens = std.mem.tokenize(u8, request_line, " \t");
+        var tokens = std.mem.tokenizeAny(u8, request_line, " \t");
 
         const method = tokens.next() orelse return error.MissingMethod;
         const url = tokens.next() orelse return error.MissingUrl;
@@ -348,8 +348,8 @@ pub const HttpResponse = struct {
     is_writing_body: bool = false,
 
     status_code: HttpStatusCode = .ok,
-    meta: std.ArrayListUnmanaged(u8) = .{},
-    headers: std.StringHashMapUnmanaged([]const u8) = .{},
+    meta: std.ArrayListUnmanaged(u8) = .empty,
+    headers: std.StringHashMapUnmanaged([]const u8) = .empty,
 
     pub fn setStatusCode(self: *HttpResponse, status_code: HttpStatusCode) !void {
         std.debug.assert(self.is_writing_body == false);
