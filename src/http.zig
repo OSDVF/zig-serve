@@ -5,7 +5,7 @@ const serve = @import("serve.zig");
 const logger = std.log.scoped(.serve_http);
 
 pub var log_connections = false;
-pub const HttpListener = struct {
+pub const Listener = struct {
     const Binding = struct {
         address: network.Address,
         port: u16,
@@ -22,14 +22,14 @@ pub const HttpListener = struct {
     /// `"/"` as the path.
     normalize_paths: bool = true,
 
-    pub fn init(allocator: std.mem.Allocator) !HttpListener {
-        return HttpListener{
+    pub fn init(allocator: std.mem.Allocator) !Listener {
+        return Listener{
             .allocator = allocator,
             .bindings = std.ArrayList(Binding).init(allocator),
         };
     }
 
-    pub fn deinit(self: *HttpListener) void {
+    pub fn deinit(self: *Listener) void {
         self.stopping.lock();
         for (self.bindings.items) |*bind| {
             if (bind.tls) |*tls| {
@@ -48,7 +48,7 @@ pub const HttpListener = struct {
 
     const AddEndpointError = error{ AlreadyExists, AlreadyStarted, TlsError, InvalidCertificate, OutOfMemory };
     pub fn addEndpoint(
-        self: *HttpListener,
+        self: *Listener,
         target_ip: serve.IP,
         port: u16,
     ) AddEndpointError!void {
@@ -73,7 +73,7 @@ pub const HttpListener = struct {
 
     const AddSecureEndpointError = error{ AlreadyExists, AlreadyStarted, TlsError, InvalidCertificate, OutOfMemory };
     pub fn addSecureEndpoint(
-        self: *HttpListener,
+        self: *Listener,
         target_ip: serve.IP,
         port: u16,
         certificate_file: []const u8,
@@ -108,7 +108,7 @@ pub const HttpListener = struct {
     }
 
     pub const StartError = std.posix.SocketError || std.posix.BindError || std.posix.ListenError || error{ NoBindings, AlreadyStarted };
-    pub fn start(self: *HttpListener) StartError!void {
+    pub fn start(self: *Listener) StartError!void {
         if (self.bindings.items.len == 0) {
             return error.NoBindings;
         }
@@ -138,7 +138,7 @@ pub const HttpListener = struct {
     }
 
     const GetContextError = std.posix.PollError || std.posix.AcceptError || network.Socket.Reader.Error || error{ UnsupportedAddressFamily, NotStarted, OutOfMemory, EndOfStream, StreamTooLong };
-    pub fn getContext(self: *HttpListener) GetContextError!?*HttpContext {
+    pub fn getContext(self: *Listener) GetContextError!?*Context {
         for (self.bindings.items) |*bind| {
             if (bind.socket == null)
                 return error.NotStarted;
@@ -180,7 +180,7 @@ pub const HttpListener = struct {
         return null;
     }
 
-    fn acceptContext(self: *HttpListener, sock: network.Socket, maybe_tls: ?*serve.TlsCore) !*HttpContext {
+    fn acceptContext(self: *Listener, sock: network.Socket, maybe_tls: ?*serve.TlsCore) !*Context {
         var client_sock: network.Socket = try sock.accept();
         errdefer client_sock.close();
 
@@ -190,8 +190,8 @@ pub const HttpListener = struct {
         var temp_memory = std.heap.ArenaAllocator.init(self.allocator);
         errdefer temp_memory.deinit();
 
-        const context = try temp_memory.allocator().create(HttpContext);
-        context.* = HttpContext{
+        const context = try temp_memory.allocator().create(Context);
+        context.* = Context{
             .memory = temp_memory,
             .socket = client_sock,
             .ssl = null,
@@ -203,7 +203,7 @@ pub const HttpListener = struct {
                 .requested_server_name = null,
                 .client_certificate = null,
             },
-            .response = HttpResponse{},
+            .response = Response{},
         };
 
         if (maybe_tls) |tls| {
@@ -225,7 +225,7 @@ pub const HttpListener = struct {
         return context;
     }
 
-    fn parseRequest(context: *HttpContext, reader: anytype) !void {
+    fn parseRequest(context: *Context, reader: anytype) !void {
         var request_line = try reader.readUntilDelimiterAlloc(context.memory.allocator(), '\n', 65536); // allow long URLs
         if (std.mem.endsWith(u8, request_line, "\r")) {
             request_line = request_line[0 .. request_line.len - 1];
@@ -280,22 +280,22 @@ pub const HttpListener = struct {
     }
 };
 
-pub const HttpContext = struct {
+pub const Context = struct {
     memory: std.heap.ArenaAllocator,
 
     socket: network.Socket,
     ssl: ?serve.TlsClient,
 
     request: HttpRequest,
-    response: HttpResponse,
+    response: Response,
 
-    fn finalize(self: *HttpContext) !void {
+    fn finalize(self: *Context) !void {
         if (!self.response.is_writing_body) {
             try self.response.writeHeaders();
         }
     }
 
-    pub fn deinit(self: *HttpContext) void {
+    pub fn deinit(self: *Context) void {
         self.finalize() catch |e| logger.warn("Failed to finalize connection: {s}", .{@errorName(e)});
 
         if (log_connections)
@@ -320,17 +320,17 @@ pub const HttpRequest = struct {
     requested_server_name: ?[]const u8,
     headers: CaseInsenitiveStringHashMapUnmanaged([]const u8) = .{},
 
-    fn getContext(self: *HttpRequest) *HttpContext {
+    fn getContext(self: *HttpRequest) *Context {
         return @fieldParentPtr("request", self);
     }
 
-    pub const Reader = std.io.Reader(*HttpResponse, Reader, read);
-    pub fn reader(self: *HttpResponse) !Reader {
+    pub const Reader = std.io.Reader(*Response, Reader, read);
+    pub fn reader(self: *Response) !Reader {
         return Reader{ .context = self };
     }
 
     pub const ReadError = serve.TlsClient.Reader.Error || network.Socket.Reader.Error;
-    fn read(self: *HttpResponse, buffer: []u8) ReadError!usize {
+    fn read(self: *Response, buffer: []u8) ReadError!usize {
         const ctx = self.getContext();
         if (ctx.ssl) |*ssl| {
             return try ssl.read(buffer);
@@ -340,29 +340,29 @@ pub const HttpRequest = struct {
     }
 };
 
-pub const HttpResponse = struct {
+pub const Response = struct {
     pub const buffer_size = 1024;
 
     const BufferedWriter = std.io.BufferedWriter(buffer_size, network.Socket.Writer);
 
     is_writing_body: bool = false,
 
-    status_code: HttpStatusCode = .ok,
+    status_code: StatusCode = .ok,
     meta: std.ArrayListUnmanaged(u8) = .empty,
     headers: std.StringHashMapUnmanaged([]const u8) = .empty,
 
-    pub fn setStatusCode(self: *HttpResponse, status_code: HttpStatusCode) !void {
+    pub fn setStatusCode(self: *Response, status_code: StatusCode) !void {
         std.debug.assert(self.is_writing_body == false);
         self.status_code = status_code;
     }
 
-    pub fn setMeta(self: *HttpResponse, text: []const u8) !void {
+    pub fn setMeta(self: *Response, text: []const u8) !void {
         std.debug.assert(self.is_writing_body == false);
         self.meta.shrinkRetainingCapacity(0);
         try self.meta.appendSlice(self.getAllocator(), text);
     }
 
-    pub fn setHeader(self: *HttpResponse, header: []const u8, value: []const u8) !void {
+    pub fn setHeader(self: *Response, header: []const u8, value: []const u8) !void {
         const allocator = self.getAllocator();
 
         // TODO: Use a non-casesensitive hash map!
@@ -380,9 +380,9 @@ pub const HttpResponse = struct {
         }
     }
 
-    pub const Writer = std.io.Writer(*HttpResponse, WriteError, write);
+    pub const Writer = std.io.Writer(*Response, WriteError, write);
     /// No headers can be written after calling this function
-    pub fn writer(self: *HttpResponse) !Writer {
+    pub fn writer(self: *Response) !Writer {
         if (!self.is_writing_body) {
             try self.writeHeaders();
         }
@@ -390,16 +390,16 @@ pub const HttpResponse = struct {
         return Writer{ .context = self };
     }
 
-    fn getContext(self: *HttpResponse) *HttpContext {
+    fn getContext(self: *Response) *Context {
         return @fieldParentPtr("response", self);
     }
 
-    fn getAllocator(self: *HttpResponse) std.mem.Allocator {
+    fn getAllocator(self: *Response) std.mem.Allocator {
         return self.getContext().memory.allocator();
     }
 
-    fn writeHeaders(self: *HttpResponse) !void {
-        var stream = HttpResponse.Writer{ .context = self };
+    fn writeHeaders(self: *Response) !void {
+        var stream = Response.Writer{ .context = self };
         const ctx = self.getContext();
 
         if (ctx.request.version.eql(HttpVersion.@"HTTP/0.9")) {
@@ -431,7 +431,7 @@ pub const HttpResponse = struct {
     }
 
     pub const WriteError = serve.TlsClient.Writer.Error || network.Socket.Writer.Error;
-    fn write(self: *HttpResponse, buffer: []const u8) WriteError!usize {
+    fn write(self: *Response, buffer: []const u8) WriteError!usize {
         const ctx = self.getContext();
         if (ctx.ssl) |*ssl| {
             return try ssl.write(buffer);
@@ -473,7 +473,7 @@ pub const HttpMethod = enum {
     CONNECT,
 };
 
-pub const HttpStatusCode = enum(u16) {
+pub const StatusCode = enum(u16) {
     @"continue" = 100, // Continue
     switching_protocols = 101, // Switching Protocols
     ok = 200, // OK

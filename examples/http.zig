@@ -12,7 +12,7 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    var listener = try serve.HttpListener.init(allocator);
+    var listener = try serve.http.Listener.init(allocator);
     defer listener.deinit();
 
     try listener.addEndpoint(.{ .ipv4 = .{ 0, 0, 0, 0 } }, 8080);
