@@ -324,13 +324,13 @@ pub const HttpRequest = struct {
         return @fieldParentPtr("request", self);
     }
 
-    pub const Reader = std.io.Reader(*Response, Reader, read);
-    pub fn reader(self: *Response) !Reader {
+    pub const Reader = std.io.Reader(*HttpRequest, ReadError, read);
+    pub fn reader(self: *HttpRequest) !Reader {
         return Reader{ .context = self };
     }
 
     pub const ReadError = serve.TlsClient.Reader.Error || network.Socket.Reader.Error;
-    fn read(self: *Response, buffer: []u8) ReadError!usize {
+    fn read(self: *HttpRequest, buffer: []u8) ReadError!usize {
         const ctx = self.getContext();
         if (ctx.ssl) |*ssl| {
             return try ssl.read(buffer);

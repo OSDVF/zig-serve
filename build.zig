@@ -24,11 +24,11 @@ const pkgs = struct {
     };
 };
 
-pub fn build(b: *std.Build.Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const mode = b.standardReleaseOptions();
+    const mode = b.standardOptimizeOption(.{});
 
-    const wolfSSL = createWolfSSL(b, target);
+    const wolfSSL = createWolfSSL(b, target.query, mode);
     wolfSSL.install();
 
     const enable_gopher = b.option(bool, "enable-gopher", "Enables building the gopher example") orelse true;
@@ -88,7 +88,7 @@ pub fn createWolfSSL(b: *std.Build, target: std.Target.Query, optimize: std.buil
     const lib = b.addStaticLibrary(.{ .name = "wolfSSL", .target = resolved_target, .optimize = optimize });
     lib.addCSourceFiles(.{ .files = wolfsslSources(b), .flags = &wolfssl_flags });
     lib.addCSourceFiles(.{ .files = wolfcryptSources(b), .flags = &wolfcrypt_flags });
-    lib.addIncludePath(.{ .path = sdkPath(b, "/vendor/wolfssl/") });
+    lib.addIncludePath(b.path(sdkPath(b, "/vendor/wolfssl/")));
 
     lib.defineCMacro("TFM_TIMING_RESISTANT", null);
     lib.defineCMacro("ECC_TIMING_RESISTANT", null);
